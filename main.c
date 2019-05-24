@@ -15,6 +15,7 @@
 //	2019.03.22	mail: Date:  Thu, 21 Mar 2019 send the one data point when you collect an IBI.
 //				2019.03.27 test ok
 //	2019.05.10	ack 增加 PIC version number 訊息 test for 0524
+//	2019.05.24	sample AN2 per 4ms -> 2019-05-24 3ms ver. [5][2][4]
 //*****************************************************************
 
 #include "mcc_generated_files/mcc.h"
@@ -38,6 +39,10 @@
 
 #define		GO_UP		1
 #define		GO_DOWN		0
+
+#define		CHK_SAMPLE_RATE					0
+#define		HEART_RATE_SAMPLE_PINOUT		1
+
 
 const uint8_t	PIC_cmd_pwrON[SEND_toRTL_CMD_SIZE] = { 'B', 'O' , 'P' , '\r' , '\n'} ;
 const uint8_t	PIC_cmd_Error[SEND_toRTL_CMD_SIZE] = { 'E', 'R' , 'R' , '\r' , '\n'} ;
@@ -169,7 +174,9 @@ void Cal_HeartRate(void)
 		if(bGet_InitValToCopmpare  == FALSE){
 			//AN2_HRminThresholdValue = AN2_AryAvg_value - AN2_ChkValue;
 			
+		#if HEART_RATE_SAMPLE_PINOUT	
 			IO_RA2_SetHigh(); // S3 key
+		#endif
 			
 			//AN2_tmpPulseCnt = 0;
 			Tmr0_1ms_cnt = 0;
@@ -181,8 +188,12 @@ void Cal_HeartRate(void)
 		// IS end point
 		//---------------------------------
 
-		if( bGet_MinVal_InCycleTime == TRUE){			
+		if( bGet_MinVal_InCycleTime == TRUE){
+			
+		#if HEART_RATE_SAMPLE_PINOUT	
 			IO_RA2_SetLow(); // S3 key
+		#endif
+			
 			AN2_tmpPulseCnt = Tmr0_1ms_cnt;
 				
 			AN2_oldPulseCnt = AN2_tmpPulseCnt; // 直接計算不調整
@@ -310,8 +321,8 @@ void main(void)
 	IO_RC7_SetDigitalOutput();	//S4_PIN
 
 	ver_moth = '5';
-	ver_date10 = '1';
-	ver_date1='0';
+	ver_date10 = '2';
+	ver_date1='4';
 	ver_dash ='0';
 
 	DugCmdMsg('V','0',ver_moth); // version number month is 
@@ -481,7 +492,7 @@ void main(void)
 						if(bADC_AN0_Delay == TRUE) bADC_AN0_Delay = FALSE; // if PWM value change will delay
 					}
 				}
-				// sample AN2 per 4ms
+				// sample AN2 per 4ms -> 2019-05-24 3ms
 				//else{
 					//AN2_tmpPulseCnt ++;
 					if( CurrentChan == ADC_CH_AN2_Event ){
@@ -521,7 +532,12 @@ void main(void)
 							if(( bAN2_GainContInRange == TRUE )||(InRangeStatus == IN_GET_AVG_STATUS))
 								Cal_HeartRate(); 
 							an2SampleCnt ++;
-
+							
+					#if CHK_SAMPLE_RATE
+							if(an2SampleCnt % 2 == 0) IO_RA2_SetHigh(); // S3 key
+							else	IO_RA2_SetLow(); // S3 key
+					#endif
+					
 							//------------------------------------
 							// Check AN2 range every sample 
 							//------------------------------------
