@@ -14,7 +14,7 @@
 //	2019.03.12	In [case AN0_UNDER_RANGE_Event:] reset AGC_MCP4011_Gain to MIDGAIN=32
 //	2019.03.22	mail: Date:  Thu, 21 Mar 2019 send the one data point when you collect an IBI.
 //				2019.03.27 test ok
-//	2019.05.10	ack 增加 PIC version number 訊息 test4
+//	2019.05.10	ack 增加 PIC version number 訊息 test for 0524
 //*****************************************************************
 
 #include "mcc_generated_files/mcc.h"
