@@ -55,9 +55,9 @@
 
 
 
-uint8_t NSTROBE_PWM_cnt;
-uint8_t NSTROBE_LOW_EndSet; 
-uint8_t NSTROBE_Rset;
+uint16_t NSTROBE_PWM_cnt;
+uint16_t NSTROBE_LOW_EndSet; 
+int8_t NSTROBE_Rset;
 
 bit bNDISCH_GoLow;
 
@@ -76,8 +76,8 @@ void TMR2_Initialize(void)
 {
     // Set TMR2 to the options selected in the User Interface
 
-    // PR2 82; 
-    PR2 = 0x52;
+    // PR2 255; 
+    PR2 = 0xFF;
 
     // TMR2 0; 
     TMR2 = 0x00;
@@ -91,8 +91,8 @@ void TMR2_Initialize(void)
     // Set Default Interrupt Handler
     TMR2_SetInterruptHandler(TMR2_InterruptHandler_davis);
 
-    // T2CKPS 1:4; T2OUTPS 1:3; TMR2ON on; 
-    T2CON = 0x15;
+    // T2CKPS 1:1; T2OUTPS 1:1; TMR2ON on; 
+    T2CON = 0x04;
 }
 
 void TMR2_StartTimer(void)
@@ -153,37 +153,232 @@ void TMR2_InterruptHandler_davis(void)
 {
 	uint8_t i;
 	
+	//	原來是 256us -> 增加 PWM 控制 間隔至 64us
+	// 64us TMR2 產生 中斷
+	// // PR2 255;     PR2 = 0xFF;
+    // // TMR2 0;     TMR2 = 0x00;
+	//
+	
 	if( NSTROBE_PWM_cnt == 0 ){ 
 		
-		/*Configure NDISCH_PIN GPIO input mode */
+		//Configure NDISCH_PIN GPIO input mode 
 		NDISCH_portSet = INPUT;
 		
 		NS1_PIN = LOW;	
-		if(NSTROBE_Rset == 1)	NS2_PIN = LOW;	
+		
+		if(NSTROBE_Rset == 1)	
+			NS2_PIN = LOW;	// 防止 設錯
 		else if(NSTROBE_Rset == 2){
 			NS2_PIN = LOW; NS3_PIN = LOW;
 		}
 		else if(NSTROBE_Rset == 3){
 			NS2_PIN = LOW; NS3_PIN = LOW; NS4_PIN = LOW;
 		}
+		
 				
 	}
 	else if( NSTROBE_PWM_cnt == NSTROBE_LOW_EndSet ){ 
+	
+
+	
 		All_NS_pin = 0xff;
 
 		SAMP_PIN = HIGH;
-		for (i = 0; i < 6; ++i);	//delay 18 us
+		
+		//for (i = 0; i < 6; ++i);	//delay 18 us
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		
+		
+		
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		
+		
+		//asm("nop");
+		
+		
 		SAMP_PIN = LOW;
 
 		/*Configure NDISCH_PIN GPIO output mode */
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");	//
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");	//
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		asm("nop");
+		
 		NDISCH_portSet = OUTPUT;
-				
 		NDISCH_PIN = LOW;
 		
 	}
 
 	NSTROBE_PWM_cnt = NSTROBE_PWM_cnt + 1;
-	if(NSTROBE_PWM_cnt > 9) NSTROBE_PWM_cnt=0;
+	if(NSTROBE_PWM_cnt > 39) NSTROBE_PWM_cnt=0;
 	
 	
 }

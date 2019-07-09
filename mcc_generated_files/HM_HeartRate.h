@@ -57,9 +57,11 @@
 #define		HM_ADC_CH_AR	channel_AN4	
 #define		HM_ADC_CH_AN0	channel_AN6	
 #define		HM_ADC_CH_AN2	channel_AN5	
-#define 	AN0_SAMPLE_QUEUE_SIZE 	5
-#define 	AN2_SAMPLE_SIZE 		500 // for 4ms * 500 = 2000ms(too large)
-#define 	AN2_ARY_SAMPLE_SIZE 		100 // for 4ms per 5 times(20ms) * 100 = 2000ms
+#define 	AN0_SAMPLE_QUEUE_SIZE 	8
+
+// 2019.05.24 改成 3ms 只能取 1.5秒 最低 40下
+#define 	AN2_SAMPLE_SIZE 		500 // for 4ms * 500 = 2000ms(too large)  最低 30下
+#define 	AN2_ARY_SAMPLE_SIZE 	100 // for 4ms per 5 times(20ms) * 100 = 2000ms
 
 #define 	AN2_SAMPLE_Inv4s_SIZE 		200
 
@@ -96,6 +98,8 @@
 #define		V0P1_VALVE		31		// 0.1V ADC
 #define		V0min_VALVE		10		// 0V min ADC
 
+
+
 #define		SEND_toRTL_DUG_CMD_SIZE	10
 
 
@@ -117,7 +121,8 @@ void GainUp (void);
 void GainDown (void);
 void DugDataMsg(uint8_t DugCma,uint8_t DugCm0,uint8_t DugCm1,uint16_t DugCm2);
 void DugCmdMsg(uint8_t DugCm0,uint8_t DugCm1,uint8_t DugCm2);
-void DugHRMsg(uint8_t DugCmA,uint8_t GainV10,uint8_t GainV1,uint8_t DugCm0,uint8_t DugCm1,uint8_t DugCm2);
+void DugHRMsg(uint8_t DugCmA,uint8_t GainV10,uint8_t GainV1,uint8_t DugCm0
+						,uint8_t DugCm1,uint8_t DugCm2,uint8_t NSTROBE,uint8_t NSTROBE_R);
 
 
 
@@ -137,15 +142,13 @@ typedef enum
 	RTL_cmdError_Event
 } SystemControlStatus_Event;
 
-
 typedef enum
 {
-    AN0_OVER_RANGE_Event = 0,
-	AN0_IN_RANGE_Event,
-	AN0_UNDER_RANGE_Event
-    
-} AN0ControlStatus_Event;
-
+	AN0_GET_RIGHT_POINT_Event = 0,
+	AN0_GO_UP_Event,
+	AN0_GO_DOWN_Event,
+	AN0_NO_MAN_state_Event
+} AN0_Status_Event;
 
 
 typedef enum

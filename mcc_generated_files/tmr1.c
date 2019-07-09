@@ -81,11 +81,11 @@ void TMR1_Initialize(void)
     //T1GSS T1G_pin; TMR1GE disabled; T1GTM disabled; T1GPOL low; T1GGO done; T1GSPM disabled; 
     T1GCON = 0x00;
 
-    //TMR1H 209; // 2019-05-24 -> 3ms
-    TMR1H = 0xD1;
+    //TMR1H 193; 
+    TMR1H = 0xC1;
 
-    //TMR1L 32; 
-    TMR1L = 0x20;
+    //TMR1L 128; 
+    TMR1L = 0x80;
 
     // Load the TMR value to reload variable
     timer1ReloadVal=(uint16_t)((TMR1H << 8) | TMR1L);
@@ -190,6 +190,14 @@ void TMR1_DefaultInterruptHandler(void){
     // or set custom function using TMR1_SetInterruptHandler()
 }
 
+//		<4 ms>
+//    TMR1H = 0xC1;
+//    TMR1L = 0x80;
+
+// 2019-05-24 -> 3ms
+//    TMR1H = 0xD1;
+//    TMR1L = 0x20;
+
 void TMR1_InterruptHandler_davis(void)
 {
 	
@@ -212,7 +220,7 @@ void TMR1_InterruptHandler_davis(void)
 	if((Tmr1_2sec_cnt > 125)&&(bSendToBT_StartTimer_Flag == TRUE)){ // per 500 msec
 	//if((Tmr1_2sec_cnt > 250)&&(bSendToBT_StartTimer_Flag == TRUE)){ // per 1000 msec
 	//if((Tmr1_2sec_cnt > 200)&&(bSendToBT_StartTimer_Flag == TRUE)){ // per 800 msec
-		bSendToBT_timer_Flag = TRUE;
+		//bSendToBT_timer_Flag = TRUE; // 只要有 計算出值就可以 送出
 		Tmr1_2sec_cnt = 0;
 	}
 	*/

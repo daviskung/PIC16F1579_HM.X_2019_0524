@@ -16,6 +16,15 @@
 //				2019.03.27 test ok
 //	2019.05.10	ack 增加 PIC version number 訊息 test for 0524
 //	2019.05.24	sample AN2 per 4ms -> 2019-05-24 3ms ver. [5][2][4]
+//	2019.06.06	NSTROBE_LOW_EndSet send out to [RTL]
+// 	2019.06.13	控制 AN0 ADC 決定 FindSetPoint()
+//				NSTROBE_Rset send out to [RTL]
+//				SAMP_PIN = HIGH; 不能用 loop delay ver. [6][1][3]
+// 	2019.06.18	TEST_ONLY_ON = 1 測試用
+//				TMR2 原來是 256us -> 增加 PWM 控制 間隔至 64us
+//				H1-1-34-4-2CD -> 格式   H1-[NSTROBE_R]-[Gain]-[NSTROBE/4]-[HR in Hex]
+//	2019.07.08	AN0 飄移 後 PWM下降 , AN0 新的進入點 亦可執行, 
+//				注意 : uint32_t 與 adc_result_t 格式不合 運算 會有問題
 //*****************************************************************
 
 #include "mcc_generated_files/mcc.h"
@@ -42,6 +51,11 @@
 
 #define		CHK_SAMPLE_RATE					0
 #define		HEART_RATE_SAMPLE_PINOUT		1
+#define		FindSetPoint_PINOUT				0
+
+#define		TEST_ONLY_ON					0
+#define		TEST_HR_error_ON				0
+
 
 
 const uint8_t	PIC_cmd_pwrON[SEND_toRTL_CMD_SIZE] = { 'B', 'O' , 'P' , '\r' , '\n'} ;
@@ -59,17 +73,19 @@ extern uint16_t	Tmr1_4ms_cnt;
 extern uint16_t Tmr1_2sec_cnt;
 extern uint16_t Tmr1_1sec_cnt;
 extern uint8_t 	Tmr1_upDate;	
-extern uint8_t	NSTROBE_PWM_cnt;
+extern uint16_t	NSTROBE_PWM_cnt;
 extern uint8_t 	AGC_MCP4011_Gain;  // current setting
 
-extern uint8_t NSTROBE_LOW_EndSet;
-extern uint8_t NSTROBE_Rset;
-
+extern uint16_t NSTROBE_LOW_EndSet;
+extern int8_t NSTROBE_Rset;
+extern adc_result_t	AN0SampAvgValue_1st;
+extern AN0_Status_Event AN0_state_control,Pre_AN0_state_control; 
 
 SystemControlStatus_Event	ControlStatus_Event ; 
 extern ADCcurrentChan_Event	CurrentChan;
 
 adc_result_t	AN0SampAvgValue;
+
 adc_result_t	AN2MaxValue,AN2MinValue,AN2_ChkValue,AN2_SampAvgBuf_Value;
 adc_result_t	AN2_HRminThresholdValue;
 uint32_t		AN2_AryAvg_value;
@@ -94,7 +110,6 @@ uint8_t S3_cnt=0;
 uint8_t S4_cnt=0;
 uint8_t AGC_MCP4011_Gain; 
 uint8_t AGC_MCP4011_Dir;  
-//uint8_t FindSetPoint_AN0_Delay;  
 extern bit bADC_AN0_Delay ;
 
 extern uint8_t AGC_MCP4011_GainLimitSet,AN2_GainContOutOfRange_CycleCnt;
@@ -117,10 +132,8 @@ extern bit bAN0_InRange,bTmr1_1sec_Flag;
 
 bit bAR_ADC_DugOn ;
 extern bit bAN0_ADC_DugOn;
-bit bCMD_AUTO_FIND_SET_POINT;
 bit bAN2_GainContInRange;
 extern bit bAN2_GainContWaitFlag;
-extern bit bAN2_LowAmplitudeFlag;
 extern uint8_t AN2_GainContInRange_cnt;
 
 uint16_t AN2_PulseIntervalAvg,AN2_READ_PulseIntervalAvg_1msCnt; // AN2_READ_PulseIntervalAvg
@@ -149,7 +162,7 @@ void CheckValResonable(void)
 	if(( AN2_tmpPulseCnt <= (AN2_oldPulseCnt - VAL_NN_INTERVAL_DIFF)) 
 		|| ( AN2_tmpPulseCnt >= (AN2_oldPulseCnt + VAL_NN_INTERVAL_DIFF))){
 		
-		AN2_tmpPulseCnt = (AN2_tmpPulseCnt + AN2_oldPulseCnt)/2;
+		AN2_tmpPulseCnt = AN2_tmpPulseCnt + VAL_NN_INTERVAL_DIFF/2;
 	#if HEART_RATE_DUG_MSG_FUN
 		DugDataMsg('1','h','r', AN2_tmpPulseCnt );
 	#endif 
@@ -195,7 +208,6 @@ void Cal_HeartRate(void)
 		#endif
 			
 			AN2_tmpPulseCnt = Tmr0_1ms_cnt;
-				
 			AN2_oldPulseCnt = AN2_tmpPulseCnt; // 直接計算不調整
 			AN2_READ_PulseIntervalAvg_1msCnt = AN2_tmpPulseCnt; // Tmr0 counter
 			bSendToBT_timer_Flag = TRUE;
@@ -296,7 +308,12 @@ void main(void)
 	Tmr1_2sec_cnt=0;	
 	Tmr1_upDate=0;	
 	ControlStatus_change=0;
-	NSTROBE_LOW_EndSet=1;
+	//ControlStatus_change = RTL_HWEnablecmd_Event;  // for test
+	NSTROBE_LOW_EndSet=20;
+	NSTROBE_Rset = 0;
+
+	AN0_state_control = AN0_NO_MAN_state_Event;
+	Pre_AN0_state_control = AN0_NO_MAN_state_Event;
 
 	S3_cnt=0;
 	bS3_PIN_PushMsgON = TRUE;
@@ -304,25 +321,29 @@ void main(void)
 	S4_cnt=0;
 	bS4_PIN_PushMsgON = TRUE;
 	bS4_PIN_Push = FALSE;
-	NSTROBE_Rset = 0;
 	
 	an0SampleCount = 0;
 	
 	bAR_ADC_DugOn = FALSE;
+	//bAN0_ADC_DugOn = TRUE ; 
 	bAN0_ADC_DugOn = FALSE ; 
 	
-	bCMD_AUTO_FIND_SET_POINT = TRUE ;
+	//bCMD_AUTO_FIND_SET_POINT = TRUE ;
 	
-	//AN2_tmpPulseCnt = 0;
+	AN2_tmpPulseCnt = 0;
 	bSendToBT_StartTimer_Flag = FALSE;
 	bTmr1_1sec_Flag = FALSE;
+	bADC_AN0_Delay = TRUE;		
 
 	IO_RA2_SetDigitalOutput(); 	//S3_PIN
 	IO_RC7_SetDigitalOutput();	//S4_PIN
 
-	ver_moth = '5';
-	ver_date10 = '2';
-	ver_date1='4';
+	NS1_PIN = LOW;
+	NS2_PIN = LOW;	
+
+	ver_moth = '7';
+	ver_date10 = '0';
+	ver_date1='8';
 	ver_dash ='0';
 
 	DugCmdMsg('V','0',ver_moth); // version number month is 
@@ -347,6 +368,14 @@ void main(void)
     		EUSART_Write( PIC_cmd_pwrON[i] );
 	}
 
+#if TEST_ONLY_ON
+	ControlStatus_Event = RTL_HWEnablecmd_Event;
+	AN2_oldPulseCnt = 0;
+	AN2_READ_PulseIntervalAvg_1msCnt = 0;
+	bSendToBT_timer_Flag = FALSE;
+	bSendToBT_StartTimer_Flag = TRUE;
+	Tmr1_2sec_cnt = 0;
+#endif
     while (1)
     {
     	//---------------------------------------
@@ -371,59 +400,7 @@ void main(void)
 			for(i = 0 ; i<RxBuffer_SIZE ; i++)	RxBuffer[i] = 0; // Clear RxBuffer[]
         }
 
-	#if KEY_IN_FUN
-		if(Tmr1_4ms_cnt%20 == 0) { 
-			//----------------------------------------------
-			// check S3 per 200 msec
-			//----------------------------------------------
-			if(S3_PIN == LOW){
-				if( (bS3_PIN_PushMsgON == TRUE) && (S3_cnt == 0) ) {
-					//DugCmdMsg('S','3' ,'p');
-					bS3_PIN_PushMsgON = FALSE;
-				}
-				if(S3_cnt > 3){
-					bS3_PIN_Push = TRUE;
-					//DugCmdMsg('S','3','P');
-				}
-				S3_cnt++;
-			}
-			else if(S3_PIN == HIGH) {			
-				S3_cnt=0;
-				bS3_PIN_PushMsgON = TRUE;
-			}
-			if((bS3_PIN_Push == TRUE) && (S3_PIN == HIGH)) {
-				NSTROBE_LOW_EndSet++;
-				if( NSTROBE_LOW_EndSet > 9 ) NSTROBE_LOW_EndSet=1;
-				DugCmdMsg('N','L',HexNumTable[NSTROBE_LOW_EndSet] );
-				bS3_PIN_Push = FALSE;
-			}
-			//----------------------------------------------
-			// check S4 per 2 msec
-			//----------------------------------------------
-			if(S4_PIN == LOW){
-				if( (bS4_PIN_PushMsgON == TRUE) && (S4_cnt == 0) ) {
-					//DugCmdMsg('S','4' ,'p');
-					bS4_PIN_PushMsgON = FALSE;
-				}
-				if(S4_cnt > 3){
-					bS4_PIN_Push = TRUE;
-					//DugCmdMsg('S','4','P');
-				}
-				S4_cnt++;
-			}
-			else if(S4_PIN == HIGH) {			
-				S4_cnt=0;
-				bS4_PIN_PushMsgON = TRUE;
-			}
-			if((bS4_PIN_Push == TRUE) && (S4_PIN == HIGH)) {
-				NSTROBE_Rset++;
-				if( NSTROBE_Rset > 3 ) NSTROBE_Rset = 0;
-				DugCmdMsg('R','S',HexNumTable[NSTROBE_Rset] );
-				bS4_PIN_Push = FALSE;
-			}
-			
-		}
-	#endif
+	
 		//---------------------------------------
         // Control Status change from the cmd from RTL
     	//---------------------------------------
@@ -441,7 +418,6 @@ void main(void)
 		        	break; 
 			case RTL_HWEnablecmd_Event: 
 				initialHWset();			
-				bAN2_LowAmplitudeFlag = TRUE;
 				ControlStatus_Event = HW_running_Event;
 		        ControlStatus_change = 0;
 		        	break; 
@@ -469,8 +445,11 @@ void main(void)
 		if( ControlStatus_Event == HW_running_Event ){
 			
 			if( bAN0_ADC_ON == TRUE ){
-				// sample AN0 per 40ms
-				if( Tmr1_4ms_cnt%10 == 1 ){
+
+				// *** AN0 設定程序 -start
+				// sample AN0 per 20ms
+				// 4 ms *5 = 20ms //2019.06.18 改回 4ms
+				if( Tmr1_4ms_cnt%5 == 1 ){			
 					ADC1_SelectChannel(HM_ADC_CH_AN0);
 					CurrentChan = ADC_CH_AN0_Event;
 					ADC1_StartConversion();
@@ -479,58 +458,61 @@ void main(void)
 					ADC1_SelectChannel(HM_ADC_CH_AN2);
 					CurrentChan = ADC_CH_AN2_Event;
 					
-					an0SampleCount++;
-					if( an0SampleCount > (AN0_SAMPLE_QUEUE_SIZE-1)){
-						AN0SampAvgValue = AN0SampValue[0];
-						for (i = 1; i < AN0_SAMPLE_QUEUE_SIZE; ++i)	AN0SampAvgValue = AN0SampAvgValue + AN0SampValue[i];
+					// 取 20 ms * 8 = 0.16 秒 平均 AN0 數值,決定 AN0 進入點
 					
+					an0SampleCount++;
+					if( an0SampleCount > (AN0_SAMPLE_QUEUE_SIZE-1)){	
+						AN0SampAvgValue = AN0SampValue[0];
+						for (i = 1; i < AN0_SAMPLE_QUEUE_SIZE; ++i){
+						
+							AN0SampAvgValue = AN0SampAvgValue + AN0SampValue[i];
+						}
 						AN0SampAvgValue = AN0SampAvgValue/AN0_SAMPLE_QUEUE_SIZE;
 						an0SampleCount = 0;
-				
-						if(( bCMD_AUTO_FIND_SET_POINT == TRUE ) && ( bADC_AN0_Delay == FALSE )) 
-							FindSetPoint(AN0SampAvgValue);		
-						if(bADC_AN0_Delay == TRUE) bADC_AN0_Delay = FALSE; // if PWM value change will delay
+
+						FindSetPoint(AN0SampAvgValue);	
+							
 					}
 				}
-				// sample AN2 per 4ms -> 2019-05-24 3ms
-				//else{
-					//AN2_tmpPulseCnt ++;
-					if( CurrentChan == ADC_CH_AN2_Event ){
+				
+				// *** AN0 設定程序 -End
+				
+				if( CurrentChan == ADC_CH_AN2_Event ){
 						
-						if( bAN0_InRange == TRUE ){
-							//-------------
-							// ADC AN2 avg
-							//-------------
-							
-							//IO_RC7_SetHigh(); // S4 key
-							
-							for (i = 0; i < AN2_SAMPLE_AVGBUF_SIZE; ++i)
-							{
+					if( bAN0_InRange == TRUE ){
+						//-------------
+						// ADC AN2 avg
+						//-------------
+														
+						for (i = 0; i < AN2_SAMPLE_AVGBUF_SIZE; ++i)
+						{
 								ADC1_StartConversion();
 								while(!ADC1_IsConversionDone());
 								AN2SampAvgBufValue[i] = ADC1_GetConversionResult();	
-							}
-							AN2_SampAvgBuf_Value = AN2SampAvgBufValue[0];
-							for (i = 1; i < AN2_SAMPLE_AVGBUF_SIZE; ++i)
-							{
-								AN2_SampAvgBuf_Value = AN2_SampAvgBuf_Value + AN2SampAvgBufValue[i] ;	
-							}
+						}
+						AN2_SampAvgBuf_Value = AN2SampAvgBufValue[0];
+						for (i = 1; i < AN2_SAMPLE_AVGBUF_SIZE; ++i)
+						{
+							AN2_SampAvgBuf_Value = AN2_SampAvgBuf_Value + AN2SampAvgBufValue[i] ;	
+						}
 							
-							//IO_RC7_SetLow(); // S4 key
 							
-							AN2_SampAvgBuf_Value = AN2_SampAvgBuf_Value/AN2_SAMPLE_AVGBUF_SIZE;
-							AN2_ChkValue = AN2_SampAvgBuf_Value;
-							if ( an2SampleCnt%5 == 0 )
+						AN2_SampAvgBuf_Value = AN2_SampAvgBuf_Value/AN2_SAMPLE_AVGBUF_SIZE;
+						AN2_ChkValue = AN2_SampAvgBuf_Value;
+						if ( an2SampleCnt%5 == 0 )
 								AN2SampValue[an2SampleCnt/5] = AN2_SampAvgBuf_Value;
 							
-							if(an2SampleCnt == 0){ 
+						if(an2SampleCnt == 0){ 
 								AN2MinValue = AN2_ChkValue;
 								AN2MaxValue = AN2_ChkValue;
 							}
 
 							// 即刻算? 不管振福
-							if(( bAN2_GainContInRange == TRUE )||(InRangeStatus == IN_GET_AVG_STATUS))
+							if(( bAN2_GainContInRange == TRUE )||(InRangeStatus == IN_GET_AVG_STATUS)){
+							
 								Cal_HeartRate(); 
+								
+							}
 							an2SampleCnt ++;
 							
 					#if CHK_SAMPLE_RATE
@@ -558,7 +540,6 @@ void main(void)
 							#endif	
 									bAN2_GainContWaitFlag = WAIT;
 									bAN2_GainContInRange = FALSE;
-									//AN2_HRBufferIndex = 0;
 									AN2_GainContInRange_cnt = 0;
 									//an2SampleCnt = 0;
 								}
@@ -578,12 +559,12 @@ void main(void)
 							
 							
 							//------------------------------------
-							// Check AN2 amplitude every 2sec 
+							// Check AN2 amplitude every 2sec (AN2_SAMPLE_SIZE * 4ms = 2 sec)
 							//------------------------------------
 
 							if( an2SampleCnt > (AN2_SAMPLE_SIZE-1)){
 									
-								if((AN2MaxValue - AN2MinValue)  < V1P5_VALVE ){ 
+								if((AN2MaxValue - AN2MinValue)  < V1P0_VALVE ){ 
 									
 									AGC_MCP4011_Dir = GO_UP;
 									MCP_setVal(AGC_MCP4011_Dir);
@@ -608,13 +589,30 @@ void main(void)
 
 								//
 								AN2_AryAvg_value = AN2SampValue[0];
-								for (i = 1; i < AN2_ARY_SAMPLE_SIZE; ++i) 
+								for (i = 1; i < AN2_ARY_SAMPLE_SIZE; ++i){ 
 									AN2_AryAvg_value = AN2_AryAvg_value + AN2SampValue[i];
-								AN2_AryAvg_value = AN2_AryAvg_value/AN2_ARY_SAMPLE_SIZE;
-								AN2_AryAvg_value = ( AN2_AryAvg_value + AN2MinValue )/2;								
+									AN2SampValue[i] = 0;	// 同時清除, 歸零 
+								}	
+								// 以平均值 為心跳檢查點
+								AN2_AryAvg_value = AN2_AryAvg_value/AN2_ARY_SAMPLE_SIZE;		
+															
+								// (以平均值 + Min value)/2 為心跳檢查點
+								AN2_AryAvg_value = ( AN2_AryAvg_value + AN2MinValue )/2;
+
+								AN2_AryAvg_value = (adc_result_t)AN2_AryAvg_value;
+
+								// 若移除 此2 debug message 會造成 心跳值 錯誤 ?
+								// ** 原因是uint32_t 與 adc_result_t 格式不合 運算 會有問題
+								//	DugDataMsg('a','v','g',AN2_AryAvg_value) ;
+								//	DugDataMsg('m','i','n',AN2MinValue) ;  		
+
+								#if AGC_MCP4011_DUG_MSG_FUN 
+									DugDataMsg('a','v','g',AN2_AryAvg_value) ; 
+								#endif
+								
 								InRangeStatus = IN_GET_AVG_STATUS;
 							#if HEART_RATE_DUG_MSG_FUN
-								DugDataMsg('m','i','n',AN2_AryAvg_value) ; 
+								//DugDataMsg('m','i','n',AN2_AryAvg_value) ; 
 							#endif
 								
 								an2SampleCnt = 0;
@@ -622,14 +620,17 @@ void main(void)
 							}
 							
 						}
+
+						//AN2_tmpPulseCnt = 0; // 檢查合理值用
+						
 					}
-				//}
+				
 				bAN0_ADC_ON = FALSE;
 
 			}
 		
 			
-			if( bSendToBT_timer_Flag == TRUE){
+			if( bSendToBT_timer_Flag == TRUE){	// 只要有 計算出值就可以 送出
 				HR_BPMvalue_1msCnt = 0;
 				if(AN2_READ_PulseIntervalAvg_1msCnt != 0)
 					
@@ -639,12 +640,11 @@ void main(void)
 				if(bAN0_InRange == TRUE){
 
 					DugHRMsg(HexNumTable[bAN2_GainContInRange],HexNumTable[AGC_MCP4011_Gain/10],HexNumTable[AGC_MCP4011_Gain%10],
-						HexNumTable[(HR_BPMvalue_1msCnt & 0xF00)>>8 ],HexNumTable[(HR_BPMvalue_1msCnt & 0xF0 )>>4],HexNumTable[(HR_BPMvalue_1msCnt & 0x0F)] );	
-						
-					//HexNumTable[3],HexNumTable[5],HexNumTable[9] );	 test OK
+						HexNumTable[(HR_BPMvalue_1msCnt & 0xF00)>>8 ],HexNumTable[(HR_BPMvalue_1msCnt & 0xF0 )>>4]
+						,HexNumTable[(HR_BPMvalue_1msCnt & 0x0F)],HexNumTable[NSTROBE_LOW_EndSet/4] ,HexNumTable[NSTROBE_Rset] );			
 				}
 				else{ 
-					DugHRMsg('2',HexNumTable[AGC_MCP4011_Gain/10],HexNumTable[AGC_MCP4011_Gain%10],'0','0','0' );
+					DugHRMsg('2',HexNumTable[AGC_MCP4011_Gain/10],HexNumTable[AGC_MCP4011_Gain%10],'0','0','0',HexNumTable[NSTROBE_LOW_EndSet/4],HexNumTable[NSTROBE_Rset]  );
 				}
 				
 				bSendToBT_timer_Flag = FALSE;
