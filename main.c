@@ -21,7 +21,10 @@
 //				NSTROBE_Rset send out to [RTL]
 //				SAMP_PIN = HIGH; 不能用 loop delay ver. [6][1][3]
 // 	2019.06.18	TEST_ONLY_ON = 1 測試用
-//				TMR2 原來是 256us -> 增加 PWM 控制 間隔至 64us
+//				->TMR2 原來是 256us -> 增加 PWM 控制 間隔至 64us 
+//				  且無法 再縮小 ,因 timer2 要以 overflow 產生中斷 , 才不會 PWM 波形 產生抖動
+//				  若與 設定值比較方式 ,  約有 10us 左右抖動 
+//
 //				H1-1-34-4-2CD -> 格式   H1-[NSTROBE_R]-[Gain]-[NSTROBE/4]-[HR in Hex]
 //	2019.07.08	AN0 飄移 後 PWM下降 , AN0 新的進入點 亦可執行, 
 //				注意 : uint32_t 與 adc_result_t 格式不合 運算 會有問題
