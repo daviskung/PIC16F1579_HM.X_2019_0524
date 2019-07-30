@@ -58,6 +58,9 @@
 uint16_t NSTROBE_PWM_cnt;
 uint16_t NSTROBE_LOW_EndSet; 
 int8_t NSTROBE_Rset;
+uint16_t Tmr2_64us_cnt,Tmr0_1ms_cnt;
+
+
 
 bit bNDISCH_GoLow;
 
@@ -379,7 +382,8 @@ void TMR2_InterruptHandler_davis(void)
 
 	NSTROBE_PWM_cnt = NSTROBE_PWM_cnt + 1;
 	if(NSTROBE_PWM_cnt > 39) NSTROBE_PWM_cnt=0;
-	
+	Tmr2_64us_cnt++;
+	if(Tmr2_64us_cnt%16 == 0) Tmr0_1ms_cnt++;
 	
 }
 

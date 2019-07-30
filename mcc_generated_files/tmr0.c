@@ -50,6 +50,8 @@
 
 #include <xc.h>
 #include "tmr0.h"
+#include "pin_manager.h"
+
 
 /**
   Section: Global Variables Definitions
@@ -69,14 +71,14 @@ void TMR0_Initialize(void)
 {
     // Set TMR0 to the options selected in the User Interface
 	
-    // PSA assigned; PS 1:32; TMRSE Increment_hi_lo; mask the nWPUEN and INTEDG bits
-    OPTION_REG = (uint8_t)((OPTION_REG & 0xC0) | (0xD4 & 0x3F)); 
+    // PSA assigned; PS 1:16; TMRSE Increment_hi_lo; mask the nWPUEN and INTEDG bits
+    OPTION_REG = (uint8_t)((OPTION_REG & 0xC0) | (0xD3 & 0x3F)); 
 	
-    // TMR0 131; 
-    TMR0 = 0x83;
+    // TMR0 6; 
+    TMR0 = 0x06;
 	
     // Load the TMR value to reload variable
-    timer0ReloadVal= 131;
+    timer0ReloadVal= 6;
 
     // Clear Interrupt flag before enabling the interrupt
     INTCONbits.TMR0IF = 0;
@@ -139,9 +141,8 @@ void TMR0_DefaultInterruptHandler(void){
 void TMR0_InterruptHandler_davis(void)
 {
 	
-	Tmr0_1ms_cnt++;
+	//Tmr0_1ms_cnt++;
 	
-
 }
 
 

@@ -7,6 +7,9 @@
 #define		HEART_RATE_DUG_MSG_FUN	0
 #define		STOP_DUG_MSG_FUN	0
 #define		AGC_MCP4011_DUG_MSG_FUN	0
+#define		HR_OUT_DUG_MSG_FUN	0
+#define		HR_OUT_AVG_MSG_FUN	1
+
 
 
 #define	NS1_PIN		IO_RB4_LAT	//LATB4
@@ -69,6 +72,7 @@
 #define 	AN2_PULSE_COUNT_SIZE 		10
 #define		AN2HR_BUF_SIZE				5
 #define		OVER_TH_LIMIT				100
+#define		UNDER_TH_LIMIT				10
 
 #define		VAL_1MIN_MS			60000
 #define		VAL_2SEC_MS			2000
@@ -98,6 +102,7 @@
 #define		V0P1_VALVE		31		// 0.1V ADC
 #define		V0min_VALVE		10		// 0V min ADC
 
+#define 	AN2_CHK_ARY_SIZE 	4
 
 
 #define		SEND_toRTL_DUG_CMD_SIZE	10
@@ -141,6 +146,7 @@ typedef enum
 	RTL_HWStopcmd_Event,	
 	RTL_cmdError_Event
 } SystemControlStatus_Event;
+	
 
 typedef enum
 {
