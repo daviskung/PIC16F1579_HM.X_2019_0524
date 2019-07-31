@@ -38,6 +38,11 @@
 //				AN2_AryAvg_value 重新變更 限制 5次以內
 //	2019.07.29	AN2ChkValueBuf[]增加平均,轉動 ear sensor 接頭 接觸問題
 //	2019.07.30	AN2_AryAvgVal_Buf[] 增加平均
+//	2019.07.31	uint8_t 與 uint16_t 在 AN2_PulseCnt_outOfRange++;
+//				結果不一樣,因 變數要定義在 main(),main()以外是 gobal var
+//				AN2_AryAvgVal_Buf[] 增加平均取消
+//				採AN2_AryAvg_value = ( AN2_AryAvg_value + AN2MinValue )/2;
+//				OVER_TH_LIMIT change to 50
 //*****************************************************************
 
 #include "mcc_generated_files/mcc.h"
@@ -161,20 +166,20 @@ uint16_t AN2_READ_PulseIntervalAvg_1msCnt;
 
 uint16_t AN2_tmpPulseCnt, AN2_OverThreshold_cnt;
 
-uint16_t HR_BPMvalue_NotGood,HR_BPMvalue_1msCnt;
+//uint16_t HR_BPMvalue_NotGood;
+uint16_t HR_BPMvalue_1msCnt;
 extern uint8_t InRangeStatus,AN2_HRBufferIndex;
 extern uint16_t AN2_oldPulseCnt;
 
 extern uint16_t Tmr0_1ms_cnt,Tmr2_64us_cnt;
 
-uint16_t AN2_HRBuffer[AN2HR_BUF_SIZE];
+//uint16_t AN2_HRBuffer[AN2HR_BUF_SIZE];
 uint8_t AN2_Avg_Cnt;  
 
 bit bGet_InitValToCopmpare,bGet_MinVal_InCycleTime;
 adc_result_t	AN2ChkValueBuf[AN2_CHK_ARY_SIZE];
 uint16_t AN2ChkValueBuf_avg;
 
-uint16_t AN2_PulseCnt_outOfRange;
 
 
 
@@ -216,6 +221,8 @@ void Cal_HeartRate(void)
 			AN2ChkValueBuf[i] = AN2_ChkValue ;	
 		}
 	}
+
+	
 	AN2ChkValueBuf_avg = AN2_ChkValue;
 	for (i = 0; i < (AN2_CHK_ARY_SIZE - 1); ++i)
 		{
@@ -260,7 +267,6 @@ void Cal_HeartRate(void)
 			AN2_READ_PulseIntervalAvg_1msCnt =AN2_tmpPulseCnt; // Tmr0 counter
 			bSendToBT_timer_Flag = TRUE;
 			bGet_InitValToCopmpare	= FALSE;
-			AN2_PulseCnt_outOfRange = 0;
 		}
 		
 		AN2_OverThreshold_cnt = 0;
@@ -279,9 +285,8 @@ void Cal_HeartRate(void)
 			&& (bGet_MinVal_InCycleTime == FALSE) )	bGet_MinVal_InCycleTime = TRUE;
 	}	
 
-	AN2_PulseCnt_outOfRange++;
 
-	if(AN2_PulseCnt_outOfRange > 500 ) AN2_Avg_Cnt = 0; //4 ms*500 = 2 sec 
+	
 	
 }
 
@@ -424,6 +429,8 @@ void main(void)
 	uint16_t tmpUINT16_val;
 	char	ver_moth,ver_date10,ver_date1,ver_dash;
 	
+	uint8_t AN2_PulseCnt_outOfRange;
+	
     // initialize the device
     SYSTEM_Initialize();
 
@@ -483,7 +490,7 @@ void main(void)
 
 	ver_moth = '7';
 	ver_date10 = '3';
-	ver_date1='0';
+	ver_date1='1';
 	ver_dash ='0';
 
 	DugCmdMsg('V','0',ver_moth); // version number month is 
@@ -639,9 +646,16 @@ void main(void)
 							
 						AN2_SampAvgBuf_Value = AN2_SampAvgBuf_Value/AN2_SAMPLE_AVGBUF_SIZE;
 						AN2_ChkValue = AN2_SampAvgBuf_Value;
-						if ( an2SampleCnt%5 == 0 )
-								AN2SampValue[an2SampleCnt/5] = AN2_SampAvgBuf_Value;
+
+						// for 4ms per 25 times(100ms) * 20 
+						//if ( an2SampleCnt%25 == 0 )	
+						//		AN2SampValue[an2SampleCnt/25] = AN2_SampAvgBuf_Value;
+
+						// for 4ms per 10 times(40ms) * 50 
+						if ( an2SampleCnt%10 == 0 )	
+								AN2SampValue[an2SampleCnt/10] = AN2_SampAvgBuf_Value;
 							
+						
 						if(an2SampleCnt == 0){ 
 								AN2MinValue = AN2_ChkValue;
 								AN2MaxValue = AN2_ChkValue;
@@ -687,6 +701,7 @@ void main(void)
 									bAN2_GainContWaitFlag = WAIT;
 									bAN2_GainContInRange = FALSE;
 									AN2_Avg_Cnt = 0; 
+									AN2_PulseCnt_outOfRange = 0;
 									AN2_GainContInRange_cnt = 0;
 									//an2SampleCnt = 0;
 								}
@@ -699,7 +714,7 @@ void main(void)
 								DugDataMsg('o','v','R',AN2_ChkValue) ; 
 							#endif
 
-							AN2_Avg_Cnt = 0; 
+							//AN2_Avg_Cnt = 0; 
 							
 							}
 								
@@ -714,7 +729,7 @@ void main(void)
 
 							if( an2SampleCnt > (AN2_SAMPLE_SIZE-1)){
 									
-								if((AN2MaxValue - AN2MinValue)  < V1P0_VALVE ){ 
+								if((AN2MaxValue - AN2MinValue)  < V1P25_VALVE ){ 
 									
 									AGC_MCP4011_Dir = GO_UP;
 									MCP_setVal(AGC_MCP4011_Dir);
@@ -727,6 +742,7 @@ void main(void)
 									AN2_GainContInRange_cnt = 0;
 									bAN2_GainContInRange = FALSE;
 									AN2_Avg_Cnt = 0; 
+									AN2_PulseCnt_outOfRange = 0;
 									//AN2_HRBufferIndex = 0;
 							#if AGC_MCP4011_DUG_MSG_FUN 
 									DugDataMsg('L','a','R',(AN2MaxValue - AN2MinValue)) ; 
@@ -738,33 +754,40 @@ void main(void)
 									bAN2_GainContInRange = TRUE;
 								}
 
-								/*
-								AN2_AryAvg_value = AN2SampValue[0];
-								for (i = 1; i < AN2_ARY_SAMPLE_SIZE; ++i){ 
-									AN2_AryAvg_value = AN2_AryAvg_value + AN2SampValue[i];
-									AN2SampValue[i] = 0;	// 同時清除, 歸零 
-								}
-								AN2_AryAvg_value = AN2_AryAvg_value/AN2_ARY_SAMPLE_SIZE;
-								*/
-								if(AN2_Avg_Cnt == 0){ //	2019.07.25
+								
+								AN2_PulseCnt_outOfRange = AN2_PulseCnt_outOfRange + 1;
+						#if HR_OUT_DUG_MSG_FUN2 
+								DugDataMsg('o','u','t',AN2_PulseCnt_outOfRange) ; // 進來新值 再平均的 新值
+						#endif
+								
+								if((AN2_Avg_Cnt == 0) || (AN2_PulseCnt_outOfRange > 5)) { //	2019.07.25
+
+									AN2_PulseCnt_outOfRange = 0;
+									AN2_AryAvg_value = AN2SampValue[0];
+									for (i = 1; i < AN2_ARY_SAMPLE_SIZE; ++i){ 
+										AN2_AryAvg_value = AN2_AryAvg_value + AN2SampValue[i];
+										AN2SampValue[i] = 0;	// 同時清除, 歸零 
+									}
+									AN2_AryAvg_value = AN2_AryAvg_value/AN2_ARY_SAMPLE_SIZE;
+								
 									// 以平均值 為心跳檢查點
 									// AN2_AryAvg_value = AN2_AryAvg_value/AN2_ARY_SAMPLE_SIZE;		
 															
 									// (以平均值 + Min value)/2 為心跳檢查點
-									//AN2_AryAvg_value = ( AN2_AryAvg_value + AN2MinValue )/2;
+									AN2_AryAvg_value = ( AN2_AryAvg_value + AN2MinValue )/2;
 
 									// (以平均值 + Max value)/2 為心跳檢查點
 									//AN2_AryAvg_value = ( AN2_AryAvg_value + AN2MaxValue )/2;
 
 									// (Min value + Max value)/2為心跳檢查點
-									AN2_AryAvg_value =  (AN2MinValue + AN2MaxValue)/2;
+									//AN2_AryAvg_value = (AN2MaxValue + AN2MinValue )/2;
 
-									#if HR_OUT_AVG_MSG_FUN 
-										DugDataMsg('a','v','N',AN2_AryAvg_value) ; // 進來新值
-									#endif
+							
+							#if HR_AVG_CHK_BUF_FUN
 
+									DugDataMsg('a','v','N',AN2_AryAvg_value) ; // 進來新值
+									
 									//AN2_AryAvgVal_Buf[AN2_AryAvgVal_Buf_SIZE]
-
 									AN2_AryAvgVal_Buf_avg = AN2_AryAvg_value;
 									for (i = 0; i < (AN2_AryAvgVal_Buf_SIZE - 1); ++i)
 									{
@@ -774,10 +797,11 @@ void main(void)
 									AN2_AryAvgVal_Buf[AN2_AryAvgVal_Buf_SIZE-1] = AN2_AryAvg_value;
 		
 									AN2_AryAvg_value =(adc_result_t)(AN2_AryAvgVal_Buf_avg/AN2_AryAvgVal_Buf_SIZE);
-								
+							#endif	
+							
 									AN2_Avg_Cnt ++;
 								
-									AN2_PulseCnt_outOfRange = 0; // 防止 超過 2秒 avg 值不合理
+									//AN2_PulseCnt_outOfRange = 0; // 防止 超過 2秒 avg 值不合理
 									
 									#if HR_OUT_AVG_MSG_FUN 
 										DugDataMsg('a','v','g',AN2_AryAvg_value) ; // 進來新值 再平均的 新值

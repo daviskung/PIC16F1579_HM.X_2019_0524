@@ -8,7 +8,9 @@
 #define		STOP_DUG_MSG_FUN	0
 #define		AGC_MCP4011_DUG_MSG_FUN	0
 #define		HR_OUT_DUG_MSG_FUN	0
+#define		HR_OUT_DUG_MSG_FUN2 0
 #define		HR_OUT_AVG_MSG_FUN	1
+#define		HR_AVG_CHK_BUF_FUN	0
 
 
 
@@ -64,14 +66,15 @@
 
 // 2019.05.24 改成 3ms 只能取 1.5秒 最低 40下
 #define 	AN2_SAMPLE_SIZE 		500 // for 4ms * 500 = 2000ms(too large)  最低 30下
-#define 	AN2_ARY_SAMPLE_SIZE 	100 // for 4ms per 5 times(20ms) * 100 = 2000ms
+//#define 	AN2_ARY_SAMPLE_SIZE 	100 // for 4ms per 5 times(20ms) * 100 = 2000ms
+#define 	AN2_ARY_SAMPLE_SIZE 	50 // for 4ms per 10 times(40ms) * 50 = 2000ms
 
 #define 	AN2_SAMPLE_Inv4s_SIZE 		200
 
 #define 	AN2_SAMPLE_AVGBUF_SIZE 		8
 #define 	AN2_PULSE_COUNT_SIZE 		10
 #define		AN2HR_BUF_SIZE				5
-#define		OVER_TH_LIMIT				100
+#define		OVER_TH_LIMIT				50	// 2019.07.31 
 #define		UNDER_TH_LIMIT				10
 
 #define		VAL_1MIN_MS			60000
@@ -93,6 +96,7 @@
 #define		V1P8_VALVE		558		// 1.8V ADC
 #define		V1P65_VALVE		512		// 1.65V ADC
 #define		V1P5_VALVE		465		// 1.5V ADC
+#define		V1P25_VALVE		388		// 1.25V ADC
 #define		V1P0_VALVE		310		// 1.0V ADC
 #define		V0P6_VALVE		186		// 0.6V ADC
 #define		V0P5_VALVE		155		// 0.5V ADC
